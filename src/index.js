@@ -1,5 +1,6 @@
 require("dotenv").config();
 const { app } = require("./app");
+const userRouter = require("./routes/user.route");
 const { connectDb } = require("./db/db_config");
 
 // Mongodb connection
@@ -13,8 +14,4 @@ connectDb()
     console.log("Connection failed: ", err);
   });
 
-app.get("/test", (req, res) => {
-  res.send("Hello World!");
-});
-
-
+app.use("/api/v1/users", userRouter);

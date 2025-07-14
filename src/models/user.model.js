@@ -31,7 +31,8 @@ const userSchema = mongoose.Schema(
       required: true,
     },
     coverImage: {
-      type: String, // cloudinary url
+      type: String,
+      default: null,
     },
     watchHistory: [
       {
@@ -54,29 +55,15 @@ const userSchema = mongoose.Schema(
   { timestamps: true }
 );
 
-const User = mongoose.model("User", userSchema);
-
-userSchema.pre("save", function (next) {
-  if (!this.isModified("password")) return next();
-  this.password = crypto.pbkdf2Sync(
-    this.password,
-    crypto.randomBytes(8).toString("hex"),
-    100000,
-    64,
-    "sha512"
-  );
-  next();
-});
-
 userSchema.pre("save", function (next) {
   if (!this.isModified("password")) return next();
 
   const salt = crypto.randomBytes(8).toString("hex");
-  const hashedPassword = crypto
+  const hash = crypto
     .pbkdf2Sync(this.password, salt, 100000, 64, "sha512")
     .toString("hex");
 
-  this.password = hashedPassword;
+  this.password = hash;
   this.salt = salt;
 
   next();
@@ -116,4 +103,5 @@ userSchema.methods.generateRefreshToken = function () {
   );
 };
 
+const User = mongoose.model("User", userSchema);
 module.exports = { User };

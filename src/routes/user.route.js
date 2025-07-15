@@ -5,6 +5,7 @@ const {
   handleUserRegister,
   handleLoginUser,
   handleLogoutUser,
+  handleRefreshAccessToken,
 } = require("../controllers/user.controller");
 
 const router = Router();
@@ -25,6 +26,9 @@ router.post(
 );
 
 router.post("/login", handleLoginUser);
+
 router.post("/logout", verifyJWT, handleLogoutUser);
+
+router.post("/refresh-token", handleRefreshAccessToken);
 
 module.exports = router;

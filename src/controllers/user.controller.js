@@ -1,5 +1,6 @@
 const { User } = require("../models/user.model");
 const { uploadCloudinary } = require("../utils/cloudinary");
+const jwt = require("jsonwebtoken");
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -106,84 +107,153 @@ async function handleLoginUser(req, res) {
   // check the credentials in the database
   // if success then give tokens (access, refresh) and some other data
   // send cookies
+  try {
+    const { email, password } = req.body;
 
-  const { userName, email, password } = req.body;
-
-  const user = await User.findOne({
-    $or: [{ email }, { userName: userName.toLowerCase() }],
-  });
-
-  if (!user) {
-    res.status(404).json({
-      status: false,
-      message: "User does not exist.",
+    const user = await User.findOne({
+      $or: [{ email }],
+      // $or: [{ email }, { userName: userName.toLowerCase() }],
     });
-  }
 
-  // Checking password & hash
-  const isPasswordValid = await user.isPasswordCorrect(password);
+    if (!user) {
+      res.status(404).json({
+        status: false,
+        message: "User does not exist.",
+      });
+    }
 
-  if (!isPasswordValid) {
-    res.status(401).json({
-      status: false,
-      message: "Invalid user credentials.",
-    });
-  }
+    // Checking password & hash
+    const isPasswordValid = await user.isPasswordCorrect(password);
 
-  // Generating tokens
-  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-    user._id
-  );
+    if (!isPasswordValid) {
+      res.status(401).json({
+        status: false,
+        message: "Invalid user credentials.",
+      });
+    }
 
-  const loggedInUser = await User.findById(user._id).select(
-    "-password -salt -refreshToken"
-  );
+    // Generating tokens
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+    );
 
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
+    const loggedInUser = await User.findById(user._id).select(
+      "-password -salt -refreshToken"
+    );
 
-  return res
-    .status(200)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", refreshToken, options)
-    .json({
-      status: true,
-      message: "Login successful",
-      user: {
+    const options = {
+      httpOnly: true,
+      secure: false, // make it true for production
+    };
+
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .json({
+        status: true,
+        message: "User logged in.",
         accessToken,
         refreshToken,
-      },
-    });
+        user: loggedInUser,
+      });
+  } catch (error) {
+    throw console.log("Error in login: ", error);
+  }
 }
 
 async function handleLogoutUser(req, res) {
-  await User.findByIdAndUpdate(
-    req.user._id,
-    {
-      $set: {
-        refreshToken: undefined,
+  try {
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          refreshToken: undefined,
+        },
       },
-    },
-    {
-      new: true,
-    }
-  );
+      {
+        new: true,
+      }
+    );
 
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
 
-  return res
-    .status(200)
-    .clearCookie("accessToken", options)
-    .clearCookie("refreshToken", options)
-    .json({
-      status: true,
-      message: "Logout successful",
-    });
+    return res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json({
+        status: true,
+        data: {},
+        message: "User logged out.",
+      });
+  } catch (error) {
+    throw console.log("Error logout: ", error);
+  }
 }
 
-module.exports = { handleUserRegister, handleLoginUser, handleLogoutUser };
+async function handleRefreshAccessToken(req, res) {
+  try {
+    const incomingRefreshToken =
+      req.cookies?.refreshToken || req.body?.refreshToken;
+
+    if (!incomingRefreshToken) {
+      res.status(401).json({
+        status: false,
+        message: "Unauthorized request.",
+      });
+    }
+
+    const decodedToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
+    );
+
+    const user = await User.findById(decodedToken?._id);
+
+    if (!user) {
+      res.status(404).json({
+        status: false,
+        message: "Invalid refresh token.",
+      });
+    }
+
+    if (incomingRefreshToken !== user?.refreshToken) {
+      res.status(401).json({
+        status: false,
+        message: "Refresh token is expired or used.",
+      });
+    }
+
+    const options = {
+      httpOnly: true,
+      secure: false, // make it true for production
+    };
+
+    const { accessToken, newRefreshToken } =
+      await generateAccessAndRefreshTokens(user._id);
+
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", newRefreshToken, options)
+      .json({
+        status: true,
+        message: "Access token refreshed.",
+        accessToken,
+        refreshToken: newRefreshToken,
+      });
+  } catch (error) {
+    throw console.log("Error refreshing token: ", error);
+  }
+}
+
+module.exports = {
+  handleUserRegister,
+  handleLoginUser,
+  handleLogoutUser,
+  handleRefreshAccessToken,
+};

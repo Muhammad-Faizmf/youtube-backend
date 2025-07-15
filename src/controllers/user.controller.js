@@ -1,6 +1,21 @@
 const { User } = require("../models/user.model");
 const { uploadCloudinary } = require("../utils/cloudinary");
 
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw console.log("Error while generating tokens: ", error);
+  }
+};
+
 async function handleUserRegister(req, res) {
   // get the data from user frontend
   // validation - not empty
@@ -85,4 +100,90 @@ async function handleUserRegister(req, res) {
   }
 }
 
-module.exports = { handleUserRegister };
+async function handleLoginUser(req, res) {
+  // get email & password
+  // validate - must not be empty
+  // check the credentials in the database
+  // if success then give tokens (access, refresh) and some other data
+  // send cookies
+
+  const { userName, email, password } = req.body;
+
+  const user = await User.findOne({
+    $or: [{ email }, { userName: userName.toLowerCase() }],
+  });
+
+  if (!user) {
+    res.status(404).json({
+      status: false,
+      message: "User does not exist.",
+    });
+  }
+
+  // Checking password & hash
+  const isPasswordValid = await user.isPasswordCorrect(password);
+
+  if (!isPasswordValid) {
+    res.status(401).json({
+      status: false,
+      message: "Invalid user credentials.",
+    });
+  }
+
+  // Generating tokens
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    user._id
+  );
+
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -salt -refreshToken"
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json({
+      status: true,
+      message: "Login successful",
+      user: {
+        accessToken,
+        refreshToken,
+      },
+    });
+}
+
+async function handleLogoutUser(req, res) {
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json({
+      status: true,
+      message: "Logout successful",
+    });
+}
+
+module.exports = { handleUserRegister, handleLoginUser, handleLogoutUser };

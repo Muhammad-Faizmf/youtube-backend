@@ -2,7 +2,6 @@ require("dotenv").config();
 const { app } = require("./app");
 const userRouter = require("./routes/user.route");
 const { connectDb } = require("./db/db_config");
-const { verifyJWT } = require("./middlewares/verify_jwt.middleware");
 
 // Mongodb connection
 connectDb()

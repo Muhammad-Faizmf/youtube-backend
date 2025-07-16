@@ -251,9 +251,95 @@ async function handleRefreshAccessToken(req, res) {
   }
 }
 
+async function handleChangePassword(req, res) {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user?._id);
+
+    const isPasswordValid = user.isPasswordCorrect(oldPassword);
+
+    if (!isPasswordValid) {
+      res.status(401).json({
+        status: false,
+        message: "Old Password is incorrect.",
+      });
+    }
+
+    user.password = newPassword;
+    user.salt = newPassword;
+
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json({
+      status: true,
+      message: "Password changed successfully.",
+    });
+  } catch (error) {
+    throw console.log("Error changing password: ", error);
+  }
+}
+
+async function handleGetCurrentUser(req, res) {
+  try {
+    res.status(200).json({
+      status: true,
+      user: req.user,
+      message: "Current user fetched successfully.",
+    });
+  } catch (error) {
+    throw console.log("Error current user: ", error);
+  }
+}
+
+async function handleUpdateAvatar(req, res) {
+  try {
+    const avatar = req.file?.path;
+
+    if (!avatar) {
+      res.status(401).json({
+        status: false,
+        message: "Avatar is missing.",
+      });
+    }
+
+    const avatarUrl = await uploadCloudinary(avatar);
+
+    if (!avatarUrl?.url) {
+      return res.status(401).json({
+        status: false,
+        message: "Avatar cloud url is required.",
+      });
+    }
+
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          avatar: avatarUrl?.url,
+        },
+      },
+      {
+        new: true,
+      }
+    );
+
+    res.status(200).json({
+      status: true,
+      message: "Avatar uploaded successfully",
+      filePath: avatarUrl?.url,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Upload failed", error: err.message });
+  }
+}
+
 module.exports = {
   handleUserRegister,
   handleLoginUser,
   handleLogoutUser,
   handleRefreshAccessToken,
+  handleChangePassword,
+  handleGetCurrentUser,
+  handleUpdateAvatar,
 };

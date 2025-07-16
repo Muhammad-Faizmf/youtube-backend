@@ -6,6 +6,9 @@ const {
   handleLoginUser,
   handleLogoutUser,
   handleRefreshAccessToken,
+  handleChangePassword,
+  handleGetCurrentUser,
+  handleUpdateAvatar,
 } = require("../controllers/user.controller");
 
 const router = Router();
@@ -25,10 +28,21 @@ router.post(
   handleUserRegister
 );
 
-router.post("/login", handleLoginUser);
+router.post("/login", upload.none(), handleLoginUser);
 
-router.post("/logout", verifyJWT, handleLogoutUser);
+router.post("/logout", verifyJWT, upload.none(), handleLogoutUser);
 
-router.post("/refresh-token", handleRefreshAccessToken);
+router.post("/refresh-token", upload.none(), handleRefreshAccessToken);
+
+router.post("/change-password", verifyJWT, upload.none(), handleChangePassword);
+
+router.get("/get-current-user", verifyJWT, upload.none(), handleGetCurrentUser);
+
+router.post(
+  "/update-avatar",
+  verifyJWT,
+  upload.single("avatar"),
+  handleUpdateAvatar
+);
 
 module.exports = router;

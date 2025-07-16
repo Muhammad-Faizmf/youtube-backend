@@ -1,6 +1,7 @@
 const { User } = require("../models/user.model");
 const { uploadCloudinary } = require("../utils/cloudinary");
 const jwt = require("jsonwebtoken");
+const { default: mongoose } = require("mongoose");
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -334,6 +335,150 @@ async function handleUpdateAvatar(req, res) {
   }
 }
 
+async function handleUserSubscriberAndChannel(req, res) {
+  const { userName } = req.query;
+
+  if (!userName?.trim()) {
+    res.status(401).json({
+      status: false,
+      message: "Username parameter is missing.",
+    });
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        userName: userName?.trim().toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+        channelSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: {
+              $in: [req.user?._id, "$subscribers.subscriber"],
+            },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        email: 1,
+        userName: 1,
+        fullName: 1,
+        subscribersCount: 1,
+        channelSubscribedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+      },
+    },
+  ]);
+  if (!channel?.length) {
+    res.status(401).json({
+      status: false,
+      message: "Channel does not exist.",
+    });
+  }
+
+  return res.status(200).json({
+    status: true,
+    message: "User channel fetched successfully.",
+    data: channel[0],
+  });
+}
+
+async function handleUserGetWatchHistory(req, res) {
+  const { id } = req.query;
+
+  if (!id) {
+    res.status(401).json({
+      status: false,
+      message: "User id parameter is missing.",
+    });
+  }
+
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    userName: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  if (!user) {
+    res.status(401).json({
+      status: false,
+      message: "User does not exist.",
+    });
+  }
+
+  return res.status(200).json({
+    status: true,
+    message: "Watch history fetched successfully.",
+    data: user[0].watchHistory,
+  });
+}
+
 module.exports = {
   handleUserRegister,
   handleLoginUser,
@@ -342,4 +487,6 @@ module.exports = {
   handleChangePassword,
   handleGetCurrentUser,
   handleUpdateAvatar,
+  handleUserSubscriberAndChannel,
+  handleUserGetWatchHistory,
 };

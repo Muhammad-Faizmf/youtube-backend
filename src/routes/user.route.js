@@ -9,6 +9,8 @@ const {
   handleChangePassword,
   handleGetCurrentUser,
   handleUpdateAvatar,
+  handleUserSubscriberAndChannel,
+  handleUserGetWatchHistory,
 } = require("../controllers/user.controller");
 
 const router = Router();
@@ -43,6 +45,20 @@ router.post(
   verifyJWT,
   upload.single("avatar"),
   handleUpdateAvatar
+);
+
+router.get(
+  "/get-user-channel",
+  verifyJWT,
+  upload.none(),
+  handleUserSubscriberAndChannel
+);
+
+router.get(
+  "/get-watch-history",
+  verifyJWT,
+  upload.none(),
+  handleUserGetWatchHistory
 );
 
 module.exports = router;

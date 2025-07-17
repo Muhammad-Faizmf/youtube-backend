@@ -40,7 +40,7 @@ router.post("/change-password", verifyJWT, upload.none(), handleChangePassword);
 
 router.get("/get-current-user", verifyJWT, upload.none(), handleGetCurrentUser);
 
-router.post(
+router.put(
   "/update-avatar",
   verifyJWT,
   upload.single("avatar"),
@@ -55,7 +55,7 @@ router.get(
 );
 
 router.get(
-  "/get-watch-history",
+  "/watch-history",
   verifyJWT,
   upload.none(),
   handleUserGetWatchHistory

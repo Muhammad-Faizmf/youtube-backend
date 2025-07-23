@@ -36,7 +36,7 @@ async function handleUserRegister(req, res) {
       return res.status(400).json({
         status: false,
         message:
-          "All Fields (username, email, fullname, password avatar) are required.",
+          "All Fields (username, email, fullname, password avatar) are required",
       });
     }
 
@@ -47,7 +47,7 @@ async function handleUserRegister(req, res) {
     if (existingUser) {
       return res.status(409).json({
         status: false,
-        message: "Username or email already exists.",
+        message: "Username or email already exists",
       });
     }
 
@@ -57,7 +57,7 @@ async function handleUserRegister(req, res) {
     if (!avatarLocalPath) {
       return res.status(400).json({
         status: false,
-        message: "Avatar file is required.",
+        message: "Avatar file is required",
       });
     }
 
@@ -68,7 +68,7 @@ async function handleUserRegister(req, res) {
     if (!avatarUrl) {
       return res.status(400).json({
         status: false,
-        message: "Avatar cloud url is required.",
+        message: "Avatar cloud url is not generated, try again",
       });
     }
 
@@ -98,7 +98,10 @@ async function handleUserRegister(req, res) {
       data: createdUser,
     });
   } catch (error) {
-    console.log(error);
+    return res.status(401).json({
+      status: false,
+      message: "Something went wrong while registering user",
+    });
   }
 }
 
@@ -119,7 +122,7 @@ async function handleLoginUser(req, res) {
     if (!user) {
       res.status(404).json({
         status: false,
-        message: "User does not exist.",
+        message: "User does not exist",
       });
     }
 
@@ -129,7 +132,7 @@ async function handleLoginUser(req, res) {
     if (!isPasswordValid) {
       res.status(401).json({
         status: false,
-        message: "Invalid user credentials.",
+        message: "Invalid user credentials",
       });
     }
 
@@ -153,7 +156,7 @@ async function handleLoginUser(req, res) {
       .cookie("refreshToken", refreshToken, options)
       .json({
         status: true,
-        message: "User logged in.",
+        message: "User logged in",
         accessToken,
         refreshToken,
         user: loggedInUser,

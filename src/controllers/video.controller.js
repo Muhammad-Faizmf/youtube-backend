@@ -2,6 +2,8 @@ const { uploadCloudinary } = require("../utils/cloudinary");
 const { Video } = require("../models/video.model");
 
 async function handleVideoUpload(req, res) {
+  const { title, description } = req.body;
+
   const videoLocalPath = req.files?.video?.[0]?.path;
   const thumbnailLocalPath = req.files?.thumbnail?.[0]?.path;
 
@@ -12,41 +14,58 @@ async function handleVideoUpload(req, res) {
     });
   }
 
-  console.log(videoLocalPath);
-  console.log(thumbnailLocalPath);
-
   // uploading video and thumnail
-  // const videoUploaded = await uploadCloudinary(videoLocalPath);
-  // const thumbnailUploaded = await uploadCloudinary(thumbnailLocalPath);
+  const videoUploaded = await uploadCloudinary(videoLocalPath);
+  const thumbnailUploaded = await uploadCloudinary(thumbnailLocalPath);
 
-  // if (!(videoUploaded?.url && thumbnailUploaded?.url)) {
-  //   return res.status(401).json({
-  //     status: false,
-  //     message: "video or thumbnail url is not generated.",
-  //   });
-  // }
+  if (!(videoUploaded?.url && thumbnailUploaded?.url)) {
+    return res.status(401).json({
+      status: false,
+      message: "video or thumbnail url is not generated.",
+    });
+  }
 
-  // const video = await Video.create({
-  //   videoFile: videoUploaded?.url,
-  //   thumbnail: "here is the thumbnail",
-  //   title: "This is first video",
-  //   description: "This is description",
-  //   duration: videoUploaded?.duration,
-  //   owner: req.user?._id,
-  // });
+  const video = await Video.create({
+    videoFile: videoUploaded?.url,
+    thumbnail: thumbnailUploaded?.url,
+    title: title,
+    description: description,
+    duration: videoUploaded?.duration,
+    owner: req.user?._id,
+  });
 
-  // if (!video) {
-  //   return res.status(401).json({
-  //     status: false,
-  //     message: "video is not added in the database.",
-  //   });
-  // }
+  if (!video) {
+    return res.status(401).json({
+      status: false,
+      message: "video is not added in the database.",
+    });
+  }
 
-  // return res.status(200).json({
-  //   status: true,
-  //   message: "Video uploaded successfully.",
-  //   video: video,
-  // });
+  return res.status(200).json({
+    status: true,
+    message: "Video uploaded successfully.",
+    video: video,
+  });
 }
 
-module.exports = { handleVideoUpload };
+async function handleMyVideos(req, res) {
+  try {
+    const videos = await Video.find({ owner: req.user._id });
+    if (videos.length == 0) {
+      return res.status(404).json({
+        status: false,
+        message: "No videos uploaded yet",
+      });
+    }
+    return res.status(200).json({
+      status: true,
+      message: "Videos fetched successfully",
+      videos: videos,
+    });
+  } catch (err) {
+    console.error("Error fetching videos:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+}
+
+module.exports = { handleVideoUpload, handleMyVideos };

@@ -1,11 +1,14 @@
 const { Router } = require("express");
 const upload = require("../middlewares/multer.middleware");
 const { verifyJWT } = require("../middlewares/verify_jwt.middleware.js");
-const { handleVideoUpload } = require("../controllers/video.controller");
+const {
+  handleVideoUpload,
+  handleMyVideos,
+} = require("../controllers/video.controller");
 
 const router = Router();
 
-router.get(
+router.post(
   "/upload-video",
   verifyJWT,
   upload.fields([
@@ -20,5 +23,7 @@ router.get(
   ]),
   handleVideoUpload
 );
+
+router.get("/my-vidoes", verifyJWT, upload.none(), handleMyVideos);
 
 module.exports = router;

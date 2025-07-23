@@ -30,6 +30,10 @@ router.post(
   handleUserRegister
 );
 
+// router.get("/test", upload.none(), (req, res) => {
+//   res.send("hello");
+// });
+
 router.post("/login", upload.none(), handleLoginUser);
 
 router.post("/logout", verifyJWT, upload.none(), handleLogoutUser);

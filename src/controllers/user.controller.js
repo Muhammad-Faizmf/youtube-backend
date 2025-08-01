@@ -417,69 +417,148 @@ async function handleUserSubscriberAndChannel(req, res) {
 }
 
 async function handleUserGetWatchHistory(req, res) {
-  const { id } = req.query;
+  const { id } = req.user?._id;
 
-  if (!id) {
-    res.status(401).json({
-      status: false,
-      message: "User id parameter is missing.",
-    });
-  }
+  try {
+    if (!id) {
+      return res.status(400).json({
+        status: false,
+        message: "User id parameter is missing.",
+      });
+    }
 
-  const user = await User.aggregate([
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(id),
+    const user = await User.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(id),
+        },
       },
-    },
-    {
-      $lookup: {
-        from: "videos",
-        localField: "watchHistory",
-        foreignField: "_id",
-        as: "watchHistory",
-        pipeline: [
-          {
-            $lookup: {
-              from: "users",
-              localField: "owner",
-              foreignField: "_id",
-              as: "owner",
-              pipeline: [
-                {
-                  $project: {
-                    fullName: 1,
-                    userName: 1,
-                    avatar: 1,
+      {
+        $lookup: {
+          from: "videos",
+          localField: "watchHistory",
+          foreignField: "_id",
+          as: "watchHistory",
+          pipeline: [
+            // Lookup video owner
+            {
+              $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                  {
+                    $project: {
+                      fullName: 1,
+                      userName: 1,
+                      avatar: 1,
+                    },
                   },
-                },
-              ],
-            },
-          },
-          {
-            $addFields: {
-              owner: {
-                $first: "$owner",
+                ],
               },
             },
-          },
-        ],
+            {
+              $addFields: {
+                owner: { $first: "$owner" },
+              },
+            },
+            // Lookup subscriber count for video owner
+            {
+              $lookup: {
+                from: "subscriptions",
+                let: { ownerId: "$owner._id" },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: { $eq: ["$channel", "$$ownerId"] },
+                    },
+                  },
+                ],
+                as: "ownerSubscribers",
+              },
+            },
+            {
+              $addFields: {
+                subscriberCount: { $size: "$ownerSubscribers" },
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                videoFile: 1,
+                thumbnail: 1,
+                title: 1,
+                description: 1,
+                duration: 1,
+                views: 1,
+                createdAt: 1,
+                subscriberCount: 1,
+                userName: "$owner.userName",
+                fullName: "$owner.fullName",
+                avatar: "$owner.avatar",
+              },
+            },
+          ],
+        },
       },
-    },
-  ]);
+    ]);
 
-  if (!user) {
-    res.status(401).json({
+    if (user[0].watchHistory.length == 0) {
+      return res.status(404).json({
+        status: false,
+        message: "No watch history yet",
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "Watch history fetched successfully.",
+      data: user[0].watchHistory,
+    });
+  } catch (error) {
+    console.error("Error fetching watch history:", error.message);
+    return res.status(500).json({
       status: false,
-      message: "User does not exist.",
+      message: "An error occurred while fetching watch history.",
     });
   }
+}
 
-  return res.status(200).json({
-    status: true,
-    message: "Watch history fetched successfully.",
-    data: user[0].watchHistory,
-  });
+async function handleAddVideoToWatchHistory(req, res) {
+  try {
+    const { videoId } = req.query;
+    const userId = req.user?._id;
+
+    if (!videoId) {
+      return res.status(400).json({
+        status: false,
+        message: "videoId parameter is required",
+      });
+    }
+    // Check if the video is already in watch history
+    const user = await User.findById(userId);
+
+    const alreadyExists = user.watchHistory.includes(videoId);
+
+    if (!alreadyExists) {
+      user.watchHistory.push(videoId);
+      await user.save();
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: alreadyExists
+        ? "Video already in watch history"
+        : "Video added to watch history",
+    });
+  } catch (error) {
+    console.error("Watch history error:", error.message);
+    res.status(500).json({
+      status: false,
+      message: "Server error while updating watch history",
+    });
+  }
 }
 
 module.exports = {
@@ -492,4 +571,5 @@ module.exports = {
   handleUpdateAvatar,
   handleUserSubscriberAndChannel,
   handleUserGetWatchHistory,
+  handleAddVideoToWatchHistory,
 };

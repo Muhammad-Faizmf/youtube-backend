@@ -2,6 +2,12 @@ const { uploadCloudinary } = require("../utils/cloudinary");
 const { Video } = require("../models/video.model");
 const { User } = require("../models/user.model");
 
+function formatDurationFromSeconds(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
 async function handleVideoUpload(req, res) {
   const { title, description } = req.body;
 
@@ -27,7 +33,7 @@ async function handleVideoUpload(req, res) {
   }
 
   // Fixed to decimal such as 15.99
-  const formattedAsDecimal = videoUploaded?.duration.toFixed(2);
+  const formattedAsDecimal = Math.round(videoUploaded?.duration);
 
   const video = await Video.create({
     videoFile: videoUploaded?.url,
